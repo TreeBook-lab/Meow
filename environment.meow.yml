@@ -1,0 +1,15 @@
+name: Meow
+channels:
+  - conda-forge
+dependencies:
+  - python=3.9
+  - pip
+  - numpy=1.26.4
+  - pandas
+  - pytables=3.9.2
+  - scikit-learn
+  - scipy
+  - xgboost
+  - pip:
+      - torch
+      - tqdm
