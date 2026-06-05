@@ -83,7 +83,7 @@ python3 meow_lgbm/meow.py  --feature-set self
 
 下面是该模型的结构示意图。
 
-<img src="/home/treeboss/WorkSpace/MEOW/Images/transformer.png" alt="image-20260605113521423" style="zoom: 25%;" />
+<img src="Images/transformer.png"  style="zoom: 25%;" />
 
 
 
@@ -118,11 +118,6 @@ python3 meow_lgbm/meow.py  --feature-set self
   <img src="Images/MeanIC对比.svg" width="30%" />
 </div>
 
-<div style="display: flex; justify-content: space-between;">
-  <img src="Images/Pearson对比.svg" width="30%" />
-  <img src="Images/Spearman对比.svg" width="30%" />
-  <img src="Images/MeanIC对比.svg" width="30%" />
-</div>
 
 通过几个关键标准的对比我们发现经过特殊处理的特征的效果明显要优于原始特征。
 
