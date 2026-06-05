@@ -83,9 +83,83 @@ python3 meow_lgbm/meow.py  --feature-set self
 
 下面是该模型的结构示意图。
 
-<img src="Images/transformer.png"  style="zoom: 25%;" />
+<img src="Images/transformer.png"  style="zoom: 25%;" height=2048/>
 
+### 关键组件
 
+| 组件 | 描述 | 参数量 |
+|---|---|---|
+| 门控特征选择 | 每个输入特征的可学习 sigmoid 门，带 L1 稀疏惩罚 | $F$ |
+| 特征投影 | Linear(94 → 256) | ~24K |
+| 股票嵌入 | Linear(500 → 16) → Linear(16 → 256)，单 ID 编码 | ~12K |
+| CrossStockAttention | 每个时间步的跨股票多头注意力；$(B,T,D) \rightarrow (T,B,D)$ | ~0.4M |
+| DecoderBlock × 3 | Pre-Norm RMSNorm + 因果注意力 + RoPE + 局部窗口 + SwiGLU FFN | ~5.7M |
+| 输出头 × 4 | 每个 horizon 一个 Linear(256 → 1) + Linear(94 → 1) 跳跃连接 | ~1.3K |
+| log_scale | 可学习的全局输出尺度因子 (exp(0) = 1.0) | 1 |
+| **总计** | | **~6.2M** |
+
+## 设计方法
+
+1. Vol20 归一化（Volatility-Aware Target Normalization）
+
+借鉴金融计量经济学中 GARCH 类模型的思想，目标变量（前向收益）按每只股票本地波动率进行归一化：
+
+$$y_{\text{train}} = \frac{\text{fret12}}{\max(|\text{vol20}|, \text{vol20}_{\text{p05}})}$$
+
+其中 $\text{vol20}$ 是 ret1 的 20 期滚动标准差。推理时进行去归一化：
+
+$$\hat{y}_{\text{raw}} = \hat{y}_{\text{model}} \times \max(|\text{vol20}|, \text{vol20}_{\text{p05}})$$
+
+这样做的效果类似于**风险调整收益**：模型学习预测「ret1 相对于 20 期波动率是几个标准差」，而非原始的绝对价格变动。高波动率股票不再主导损失函数——解决高频金融数据中的**异方差性**（heteroskedasticity）问题。
+
+2. RoPE 旋转位置编码（Rotary Position Embedding）
+
+与传统的加法正弦位置编码不同，RoPE通过**乘法**将位置信息注入注意力机制：
+
+$$\text{RoPE}(q, m) = q \cdot e^{im\theta}$$
+
+关键性质：$\langle \text{RoPE}(q_m), \text{RoPE}(k_n) \rangle$ 只依赖于相对位置 $m - n$，而非绝对位置 $m$ 和 $n$。这使得模型天然具有**相对位置感知**和**长度外推**能力，对于可变长度的日内交易序列尤为重要。
+
+3. 多 horizon 预测头（Multi-Horizon Heads with Auxiliary Loss）
+
+共享 Transformer backbone，带 4 个独立预测头：
+
+```
+                    ┌→ head_fret1  (1-step,  高噪声)
+Transformer shared ──┼→ head_fret6  (6-step,  中等信号)
+                    ├→ head_fret12 (12-step, 主要目标)
+                    └→ head_fret24 (24-step, 时序最平滑)
+```
+
+这是借鉴了**多任务学习**和时序预测中的**多 horizon 策略**。共享的 backbone 被迫学习对所有 horizon 都有效的表示——这充当了天然的正则化器。短 horizon 提供更密集的梯度信号（样本更多），长 horizon 提供更平滑的优化 landscape。
+
+4. 混合损失函数（Hybrid Loss: MSE + Pearson）
+
+$$\mathcal{L} = \underbrace{\frac{1}{N}\sum(p_i - y_i)^2 / \text{Var}(y)}_{\text{MSE (scale accuracy)}} + \underbrace{0.5 \cdot \left(-\frac{\text{Cov}(p, y)}{\sigma_p \sigma_y}\right)}_{\text{Pearson Correlation (ranking quality)}}$$
+
+两类损失量级相似（均归一化至 O(1)）：
+- **MSE** 驱动预测尺度精度——直接优化 $R^2$
+- **Pearson** 驱动截面排名质量——直接优化交易信号
+
+这种设计直接回应了金融预测的核心矛盾：准确的排名（买入哪些股票）比精确的尺度（预测变动多少）更重要。传统的纯 MSE 训练会因极度噪声的收益分布而导致梯度消失；纯 Pearson 训练虽然排名好但预测尺度任意。混合损失平衡了两者。
+
+5. Pre-Norm 残差连接 + RMSNorm
+
+每个 DecoderBlock 使用 **Pre-Norm** 模式（先归一化，后计算）：
+
+$$x \leftarrow x + \text{Sublayer}(\text{RMSNorm}(x))$$
+
+与 Post-Norm（原始 Transformer）对比，Pre-Norm 在训练初期不稳定时提供更平滑的梯度流动。使用**RMSNorm**（而非 LayerNorm）将归一化计算的参数量减少了一半，同时保持等价效果。
+
+6. SwiGLU 前馈网络
+
+$$\text{FFN}(x) = W_{\text{out}} \cdot (\text{SiLU}(W_{\text{gate}} \cdot x) \odot W_{\text{up}} \cdot x)$$
+
+SwiGLU通过门控线性单元提供比标准 ReLU-FFN 更丰富的非线性表示能力，在相同参数预算下表现更好。
+
+7. 混合精度训练（Mixed Precision Training）
+
+使用 `torch.amp.autocast("cuda")` 进行自动混合精度训练——前向和反向传播的大部分计算在 FP16 下进行，关键步骤（如 softmax、loss）保持在 FP32。GradScaler 处理梯度下溢。这在 RTX 4060 8GB 上~6.2M 参数的模型中提供了约 1.5× 的加速比。
 
 ## Results
 

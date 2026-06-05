@@ -2,3 +2,6 @@ archive/
 archive.zip
 .vscode/
 Meow.md
+
+.venv/
+meow_decoder_only/__pycache__
