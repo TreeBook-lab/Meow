@@ -69,7 +69,6 @@ class MeowEngine:
             raw = self.dloader.load_date(date)
             xdf, ydf = self.feat_gen.gen_features(raw)
 
-            # Predictions in raw fret12 space (vol20-denormalised)
             p = self.predict(xdf, denormalize=True)
 
             eval_df = ydf.copy()
@@ -80,6 +79,6 @@ class MeowEngine:
 
 
 if __name__ == "__main__":
-    engine = MeowEngine(h5dir="../archive", cache_dir=None)
+    engine = MeowEngine(h5dir="archive/", cache_dir=None)
     engine.fit(20230601, 20231130)
     engine.eval(20231201, 20231229)

@@ -35,7 +35,7 @@ class MeowXGEngine(object):
     def __init__(
         self,
         h5dir,
-        cacheDir,
+        cache_dir,
         *,
         feature_set: str = "baseline",
         cross_day: int = 0,
@@ -48,18 +48,18 @@ class MeowXGEngine(object):
         if not os.path.isdir(h5dir):
             raise ValueError("Invalid data directory: {}".format(self.h5dir))
 
-        self.cacheDir = cacheDir  # not used in sample code
+        self.cache_dir = cache_dir  # not used in sample code
         self.dloader = MeowDataLoader(h5dir=h5dir)
         self.feature_set = str(feature_set)
         self.cross_day = int(cross_day)
         if self.feature_set == "self":
             if MeowSelfFeatureGenerator is None:
                 raise ImportError("meow_self feature generator not available")
-            self.featGenerator = MeowSelfFeatureGenerator(cacheDir=cacheDir)
+            self.feat_generator = MeowSelfFeatureGenerator(cache_dir=cache_dir)
         else:
-            self.featGenerator = MeowFeatureGenerator(cacheDir=cacheDir)
-        self.model = MeowXGModel(cacheDir=cacheDir, config=xgb_config)
-        self.evaluator = MeowEvaluator(cacheDir=cacheDir)
+            self.feat_generator = MeowFeatureGenerator(cache_dir=cache_dir)
+        self.model = MeowXGModel(cache_dir=cache_dir, config=xgb_config)
+        self.evaluator = MeowEvaluator(cache_dir=cache_dir)
 
     def _required_columns(self):
         if self.feature_set == "self":
@@ -79,36 +79,36 @@ class MeowXGEngine(object):
             "fret12",
         ]
 
-    def fit(self, startDate, endDate):
-        dates = self.calendar.range(startDate, endDate)
+    def fit(self, start_date, end_date):
+        dates = self.calendar.range(start_date, end_date)
         # Allow optional per-date row cap to reduce peak memory when generating
         # the (potentially large) `self` feature set. Set `self.max_rows_per_date`
         # externally if desired; default is 0 (no cap).
-        rawData = self.dloader.loadDates(
+        raw_data = self.dloader.load_dates(
             dates, columns=self._required_columns(), max_rows_per_date=getattr(self, "max_rows_per_date", 0)
         )
         log.inf("Running XGBoost model fitting...")
         if self.feature_set == "self":
-            xdf, ydf = self.featGenerator.genFeatures(rawData, cross_day=bool(self.cross_day))
+            xdf, ydf = self.feat_generator.gen_features(raw_data, cross_day=bool(self.cross_day))
         else:
-            xdf, ydf = self.featGenerator.genFeatures(rawData)
-        xdf, ydf = _maybe_subsample_xy(xdf, ydf, max_rows=getattr(self, "maxTrainRows", None), seed=getattr(self, "seed", 1))
+            xdf, ydf = self.feat_generator.gen_features(raw_data)
+        xdf, ydf = _maybe_subsample_xy(xdf, ydf, max_rows=getattr(self, "max_train_rows", None), seed=getattr(self, "seed", 1))
         self.model.fit(xdf, ydf)
 
     def predict(self, xdf):
         return self.model.predict(xdf)
 
-    def eval(self, startDate, endDate):
+    def eval(self, start_date, end_date):
         log.inf("Running model evaluation...")
-        dates = self.calendar.range(startDate, endDate)
-        rawData = self.dloader.loadDates(
+        dates = self.calendar.range(start_date, end_date)
+        raw_data = self.dloader.load_dates(
             dates, columns=self._required_columns(), max_rows_per_date=getattr(self, "max_rows_per_date", 0)
         )
         if self.feature_set == "self":
-            xdf, ydf = self.featGenerator.genFeatures(rawData, cross_day=bool(self.cross_day))
+            xdf, ydf = self.feat_generator.gen_features(raw_data, cross_day=bool(self.cross_day))
         else:
-            xdf, ydf = self.featGenerator.genFeatures(rawData)
-        xdf, ydf = _maybe_subsample_xy(xdf, ydf, max_rows=getattr(self, "maxTestRows", None), seed=getattr(self, "seed", 1))
+            xdf, ydf = self.feat_generator.gen_features(raw_data)
+        xdf, ydf = _maybe_subsample_xy(xdf, ydf, max_rows=getattr(self, "max_test_rows", None), seed=getattr(self, "seed", 1))
         ydf.loc[:, "forecast"] = self.predict(xdf)
         self.evaluator.eval(ydf)
 
@@ -176,7 +176,7 @@ if __name__ == "__main__":
 
     engine = MeowXGEngine(
         h5dir=args.h5dir,
-        cacheDir=None,
+        cache_dir=None,
         feature_set=args.feature_set,
         cross_day=args.cross_day,
         xgb_config=xgb_cfg,
@@ -191,15 +191,15 @@ if __name__ == "__main__":
                 learning_rate=args.learning_rate,
                 random_state=args.seed,
             )
-            engine.model = MeowLGBModel(cacheDir=None, config=lgb_cfg)
+            engine.model = MeowLGBModel(cache_dir=None, config=lgb_cfg)
         except Exception as e:
             raise
     # When using the heavier `self` feature set, cap rows per date to avoid OOM by default.
     if args.feature_set == "self":
         # Use a conservative per-date row cap to avoid OOM during heavy feature generation.
         engine.max_rows_per_date = 5000
-    engine.maxTrainRows = args.max_train_rows
-    engine.maxTestRows = args.max_test_rows
+    engine.max_train_rows = args.max_train_rows
+    engine.max_test_rows = args.max_test_rows
     engine.seed = args.seed
     engine.fit(args.train_start, args.train_end)
     engine.eval(args.test_start, args.test_end)

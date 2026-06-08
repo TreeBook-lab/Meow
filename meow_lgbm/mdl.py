@@ -6,18 +6,18 @@ from log import log
 
 
 class MeowModel(object):
-    def __init__(self, cacheDir, modelType="mlp"):
-        self.cacheDir = cacheDir
-        self.modelType = modelType
+    def __init__(self, cache_dir, model_type="mlp"):
+        self.cache_dir = cache_dir
+        self.model_type = model_type
         self.scaler = StandardScaler()
-        if modelType == "ridge":
+        if model_type == "ridge":
             self.estimator = Ridge(
                 alpha=0.5,
                 random_state=None,
                 fit_intercept=False,
                 tol=1e-8
             )
-        elif modelType == "mlp":
+        elif model_type == "mlp":
             self.estimator = MLPRegressor(
                 hidden_layer_sizes=(256, 128, 64, 32),
                 activation="relu",
@@ -35,7 +35,7 @@ class MeowModel(object):
                 validation_fraction=0.1,
                 n_iter_no_change=10,
             )
-        elif modelType == "lgb":
+        elif model_type == "lgb":
             try:
                 import lightgbm as lgb
                 self.estimator = lgb.LGBMRegressor(
@@ -55,7 +55,7 @@ class MeowModel(object):
                 )
             except ImportError:
                 log.yellow("LightGBM not installed, falling back to MLP")
-                self.modelType = "mlp"
+                self.model_type = "mlp"
                 self.estimator = MLPRegressor(
                     hidden_layer_sizes=(256, 128, 64, 32),
                     activation="relu",
@@ -74,8 +74,8 @@ class MeowModel(object):
                     n_iter_no_change=10,
                 )
         else:
-            raise ValueError("Unknown model type: {}".format(modelType))
-        log.inf("MeowModel initialized with type={}".format(self.modelType))
+            raise ValueError("Unknown model type: {}".format(model_type))
+        log.inf("MeowModel initialized with type={}".format(self.model_type))
 
     def fit(self, xdf, ydf):
         import gc
@@ -92,7 +92,7 @@ class MeowModel(object):
         X = self.scaler.fit_transform(X).astype(np.float32)
         gc.collect()
         log.inf("Training {} model on {} samples with {} features...".format(
-            self.modelType, X.shape[0], X.shape[1]
+            self.model_type, X.shape[0], X.shape[1]
         ))
         self.estimator.fit(X, y)
         log.inf("Done fitting")

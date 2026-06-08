@@ -8,41 +8,41 @@ from tradingcalendar import Calendar
 
 
 class MeowEngine(object):
-    def __init__(self, h5dir, cacheDir=None, modelType="mlp"):
+    def __init__(self, h5dir, cache_dir=None, model_type="mlp"):
         self.calendar = Calendar()
         self.h5dir = h5dir
         if not os.path.exists(h5dir):
             raise ValueError("Data directory not exists: {}".format(self.h5dir))
         if not os.path.isdir(h5dir):
             raise ValueError("Invalid data directory: {}".format(self.h5dir))
-        self.cacheDir = cacheDir
+        self.cache_dir = cache_dir
         self.dloader = MeowDataLoader(h5dir=h5dir)
-        self.featGenerator = MeowFeatureGenerator(cacheDir=cacheDir)
-        self.model = MeowModel(cacheDir=cacheDir, modelType=modelType)
-        self.evaluator = MeowEvaluator(cacheDir=cacheDir)
+        self.feat_generator = MeowFeatureGenerator(cache_dir=cache_dir)
+        self.model = MeowModel(cache_dir=cache_dir, model_type=model_type)
+        self.evaluator = MeowEvaluator(cache_dir=cache_dir)
 
-    def fit(self, startDate, endDate):
-        dates = self.calendar.range(startDate, endDate)
-        rawData = self.dloader.loadDates(dates)
+    def fit(self, start_date, end_date):
+        dates = self.calendar.range(start_date, end_date)
+        raw_data = self.dloader.load_dates(dates)
         log.inf("Running model fitting...")
-        xdf, ydf = self.featGenerator.genFeatures(rawData)
+        xdf, ydf = self.feat_generator.gen_features(raw_data)
         self.model.fit(xdf, ydf)
 
     def predict(self, xdf):
         return self.model.predict(xdf)
 
-    def eval(self, startDate, endDate):
+    def eval(self, start_date, end_date):
         log.inf("Running model evaluation...")
-        dates = self.calendar.range(startDate, endDate)
-        rawData = self.dloader.loadDates(dates)
-        xdf, ydf = self.featGenerator.genFeatures(rawData)
+        dates = self.calendar.range(start_date, end_date)
+        raw_data = self.dloader.load_dates(dates)
+        xdf, ydf = self.feat_generator.gen_features(raw_data)
         ydf.loc[:, "forecast"] = self.predict(xdf)
         self.evaluator.eval(ydf)
 
 
 if __name__ == "__main__":
     import os
-    data_dir = '/home/treeboss/WorkSpace/MEOW/archive'
-    engine = MeowEngine(h5dir=data_dir, cacheDir=None, modelType="lgb")
+    data_dir = "archive"
+    engine = MeowEngine(h5dir=data_dir, cache_dir=None, model_type="lgb")
     engine.fit(20230601, 20231130)
     engine.eval(20231201, 20231229)

@@ -28,8 +28,8 @@ class XGBoostConfig:
 
 
 class MeowXGModel(object):
-    def __init__(self, cacheDir, config: Optional[XGBoostConfig] = None):
-        self.cacheDir = cacheDir
+    def __init__(self, cache_dir, config: Optional[XGBoostConfig] = None):
+        self.cache_dir = cache_dir
         self.config = config or XGBoostConfig()
         self.estimator = None
 

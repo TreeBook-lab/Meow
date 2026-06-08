@@ -9,20 +9,20 @@ class MeowDataLoader(object):
         self.h5dir = h5dir
         self.calendar = Calendar()
 
-    def loadDates(self, dates, *, columns=None, max_rows_per_date: int = 0, seed: int = 1):
+    def load_dates(self, dates, *, columns=None, max_rows_per_date: int = 0, seed: int = 1):
         if len(dates) == 0:
             raise ValueError("Dates empty")
         log.inf("Loading data of {} dates from {} to {}...".format(len(dates), min(dates), max(dates)))
         return pd.concat(
-            (self.loadDate(x, columns=columns, max_rows=max_rows_per_date, seed=seed) for x in dates),
+            (self.load_date(x, columns=columns, max_rows=max_rows_per_date, seed=seed) for x in dates),
             axis=0,
         )
 
-    def loadDate(self, date, *, columns=None, max_rows: int = 0, seed: int = 1):
-        if not self.calendar.isTradingDay(date):
+    def load_date(self, date, *, columns=None, max_rows: int = 0, seed: int = 1):
+        if not self.calendar.is_trading_day(date):
             raise ValueError("Not a trading day: {}".format(date))
-        h5File = os.path.join(self.h5dir, "{}.h5".format(date))
-        df = pd.read_hdf(h5File)
+        h5_file = os.path.join(self.h5dir, "{}.h5".format(date))
+        df = pd.read_hdf(h5_file)
 
         # Optional: limit columns early to reduce memory.
         if columns is not None:
@@ -40,10 +40,9 @@ class MeowDataLoader(object):
 
         df.loc[:, "date"] = date
         precols = ["symbol", "interval", "date"]
-        df = df[precols + [x for x in df.columns if x not in precols]] # re-arrange columns
+        df = df[precols + [x for x in df.columns if x not in precols]]  # re-arrange columns
         return df
-    
+
 if __name__ == "__main__":
     df = pd.read_hdf("/home/treeboss/WorkSpace/MEOW/archive/20230602.h5")
     print(df.head())
-

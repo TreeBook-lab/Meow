@@ -21,8 +21,8 @@ class LGBConfig:
 
 
 class MeowLGBModel(object):
-    def __init__(self, cacheDir, config: Optional[LGBConfig] = None):
-        self.cacheDir = cacheDir
+    def __init__(self, cache_dir, config: Optional[LGBConfig] = None):
+        self.cache_dir = cache_dir
         self.config = config or LGBConfig()
         self.estimator = None
 

@@ -5,38 +5,38 @@ from log import log
 
 class Calendar(object):
     def __init__(self):
-        calendarFile = os.path.join(os.path.dirname(__file__), "resources/calendar")
-        with open(calendarFile) as f:
+        calendar_file = os.path.join(os.path.dirname(__file__), "resources/calendar")
+        with open(calendar_file) as f:
             tokens = f.read().splitlines()
-            self.tradingDays = sorted([int(x) for x in tokens])
-            self.tradingDaySet = set(self.tradingDays)
+            self.trading_days = sorted([int(x) for x in tokens])
+            self.trading_day_set = set(self.trading_days)
 
-    def isTradingDay(self, date):
+    def is_trading_day(self, date):
         if not isinstance(date, int):
             date = int(date)
-        return date in self.tradingDaySet
+        return date in self.trading_day_set
 
-    def toTradingDay(self, date):
+    def to_trading_day(self, date):
         if not isinstance(date, int):
             date = int(date)
-        index = bisect.bisect_left(self.tradingDays, date)
-        return self.tradingDays[index]
+        index = bisect.bisect_left(self.trading_days, date)
+        return self.trading_days[index]
 
     def next(self, date):
         if not isinstance(date, int):
             date = int(date)
-        index = bisect.bisect_right(self.tradingDays, date)
-        if index >= len(self.tradingDays):
+        index = bisect.bisect_right(self.trading_days, date)
+        if index >= len(self.trading_days):
             return None
-        return self.tradingDays[index]
+        return self.trading_days[index]
 
     def prev(self, date):
         if not isinstance(date, int):
             date = int(date)
-        index = bisect.bisect_left(self.tradingDays, date)
+        index = bisect.bisect_left(self.trading_days, date)
         if index == 0:
             return None
-        return self.tradingDays[index - 1]
+        return self.trading_days[index - 1]
 
     def shift(self, date, n):
         if not isinstance(date, int):
@@ -45,11 +45,11 @@ class Calendar(object):
             log.red("Invalid shift n: {}".format(n))
             return None
 
-        index = bisect.bisect_left(self.tradingDays, date)
+        index = bisect.bisect_left(self.trading_days, date)
         if index == 0:
             log.red("Failed to shift for date {}, n={}".format(date, n))
             return None
-        return self.tradingDays[index + n]
+        return self.trading_days[index + n]
 
     def prevn(self, date, n):
         if not isinstance(date, int):
@@ -58,14 +58,14 @@ class Calendar(object):
             log.red("Invalid prevn: date={},n={}".format(date, n))
             return None
 
-        index = bisect.bisect_left(self.tradingDays, date)
+        index = bisect.bisect_left(self.trading_days, date)
         if index == 0:
             log.red("Failed to find prev trading day for date {}".format(date))
             return None
         if index < n:
             log.yellow("Not enough days for prevn: date={},n={},index={}".format(date, n, index))
 
-        return self.tradingDays[max(index - n, 0) : index]
+        return self.trading_days[max(index - n, 0) : index]
 
     def nextn(self, date, n):
         if not isinstance(date, int):
@@ -74,28 +74,28 @@ class Calendar(object):
             log.red("Invalid nextn: date={},n={}".format(date, n))
             return None
 
-        index = bisect.bisect_right(self.tradingDays, date)
-        if index >= len(self.tradingDays):
+        index = bisect.bisect_right(self.trading_days, date)
+        if index >= len(self.trading_days):
             log.red("Failed to find next trading day for date {}".format(date))
             return None
-        if index + n > len(self.tradingDays):
+        if index + n > len(self.trading_days):
             log.yellow("Not enough days for next: date={},n={},index={}".format(date, n, index))
 
-        return self.tradingDays[index: min(index + n, len(self.tradingDays))]
+        return self.trading_days[index: min(index + n, len(self.trading_days))]
 
-    def range(self, startDate, endDate):
-        if not isinstance(startDate, int):
-            startDate = int(startDate)
-        if not isinstance(endDate, int):
-            endDate = int(endDate)
-        if startDate > endDate:
-            log.red("Invalid range - startDate is larger than endDate: startDate={},endDate={}".format(startDate, endDate))
+    def range(self, start_date, end_date):
+        if not isinstance(start_date, int):
+            start_date = int(start_date)
+        if not isinstance(end_date, int):
+            end_date = int(end_date)
+        if start_date > end_date:
+            log.red("Invalid range - start_date is larger than end_date: start_date={},end_date={}".format(start_date, end_date))
             return None
 
-        startIndex = bisect.bisect_left(self.tradingDays, startDate)
-        if (startIndex == len(self.tradingDays)):
-            log.red("No valid trading days found within the range [{}, {})".format(startDate, endDate))
+        start_index = bisect.bisect_left(self.trading_days, start_date)
+        if (start_index == len(self.trading_days)):
+            log.red("No valid trading days found within the range [{}, {})".format(start_date, end_date))
             return None
 
-        endIndex = bisect.bisect_right(self.tradingDays, endDate)
-        return self.tradingDays[startIndex : endIndex]
+        end_index = bisect.bisect_right(self.trading_days, end_date)
+        return self.trading_days[start_index : end_index]

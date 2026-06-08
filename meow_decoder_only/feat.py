@@ -92,21 +92,19 @@ class MeowFeatureGenerator:
 
         df["midpx"] = (df["bid0"] + df["ask0"]) / 2.0
 
-        # ---- Multi-horizon forward returns (targets) ----
         for horizon in [1, 6, 24]:
             shifted = df.groupby("symbol")["midpx"].shift(-horizon)
             df[f"fret{horizon}"] = shifted / df["midpx"] - 1.0
-        # Ensure fret12 exists (from raw data or compute if missing)
         if "fret12" not in df.columns:
             shifted = df.groupby("symbol")["midpx"].shift(-12)
             df["fret12"] = shifted / df["midpx"] - 1.0
 
-        # ---- Price returns ----
+        # Price returns
         g = df.groupby("symbol")
         for h in [1, 5, 10, 30]:
             df[f"ret{h}"] = g["midpx"].diff(h) / (g["midpx"].shift(h) + eps)
 
-        # ---- Volatility family ----
+        # Volatility family
         g = df.groupby("symbol")
         df["vol5"] = g["ret1"].transform(
             lambda x: x.rolling(5, min_periods=3).std())
@@ -118,7 +116,7 @@ class MeowFeatureGenerator:
         df["vol_ratio_5_20"] = df["vol5"] / (df["vol20"] + eps)
         df["ret1_sign"] = np.sign(df["ret1"])
 
-        # ---- Spread & depth ----
+        # Spread & depth
         df["spread"] = (df["ask0"] - df["bid0"]) / (df["midpx"] + eps)
         df["spread4"] = (df["ask4"] - df["bid4"]) / (df["midpx"] + eps)
         df["depth_imb"] = np.log((df["asize0_4"] + eps) / (df["bsize0_4"] + eps))
@@ -126,14 +124,14 @@ class MeowFeatureGenerator:
             df["bsize0_4"] + df["asize0_4"] + eps)
         df["depth_total"] = np.log(df["bsize0"] + df["asize0"] + 1.0)
 
-        # ---- Order book imbalance ----
+        # Order book imbalance
         df["ob_imb0"] = (df["asize0"] - df["bsize0"]) / (df["asize0"] + df["bsize0"] + eps)
         df["ob_imb4"] = (df["asize0_4"] - df["bsize0_4"]) / (df["asize0_4"] + df["bsize0_4"] + eps)
         df["ob_imb9"] = (df["asize5_9"] - df["bsize5_9"]) / (df["asize5_9"] + df["bsize5_9"] + eps)
         df["ob_slope"] = df["ob_imb0"] - df["ob_imb9"]
         df["ob_curvature"] = df["ob_imb0"] - 2 * df["ob_imb4"] + df["ob_imb9"]
 
-        # ---- Trade features ----
+        # Trade features
         df["trade_imb"] = (df["tradeBuyQty"] - df["tradeSellQty"]) / (
             df["tradeBuyQty"] + df["tradeSellQty"] + eps)
         df["trade_count_imb"] = (df["nTradeBuy"] - df["nTradeSell"]) / (
@@ -144,7 +142,7 @@ class MeowFeatureGenerator:
         df["vwap_dev"] = ((buy_vwap + sell_vwap) / 2.0 - df["midpx"]) / (df["midpx"] + eps)
         df["volume_intensity"] = df["log_trade_volume"] / (df["vol20"] + eps)
 
-        # ---- EMA families (multi-scale smoothing) ----
+        # EMA families (multi-scale smoothing)
         g = df.groupby("symbol")
         for col, hl in [("ob_imb0", 10), ("ob_imb0", 30),
                         ("trade_imb", 5), ("trade_imb", 30),
@@ -152,17 +150,17 @@ class MeowFeatureGenerator:
             df[f"{col}_ema{hl}"] = g[col].transform(
                 lambda x, h=hl: x.ewm(halflife=h, min_periods=1).mean())
 
-        # ---- Cross-sectional (demeaned by interval) ----
+        # Cross-sectional (demeaned by interval)
         for col in ["ret1", "ret10", "ob_imb0", "trade_imb", "vol20"]:
             mu = df.groupby("interval")[col].transform("mean")
             df[f"cx_{col}"] = df[col] - mu
 
-        # ---- Percentile ranks (robust cross-sectional signal) ----
+        # Percentile ranks (robust cross-sectional signal)
         for col in ["ob_imb0", "trade_imb", "ret1", "vol20"]:
             df[f"rank_{col}"] = df.groupby("interval")[col].transform(
                 lambda x: x.rank(pct=True))
 
-        # ---- Momentum / reversal ----
+        # Momentum / reversal
         g = df.groupby("symbol")
         df["bret12"] = g["midpx"].diff(12) / (g["midpx"].shift(12) + eps)
         cx_bret12 = df.groupby("interval")["bret12"].transform("mean")
@@ -171,16 +169,16 @@ class MeowFeatureGenerator:
         df["ret5_ret1"] = df["ret5"] / (np.abs(df["ret1"]) + eps)
         df["ret30_ret5"] = df["ret30"] / (np.abs(df["ret5"]) + eps)
 
-        # ---- Market quality ----
+        # Market quality
         df["price_impact"] = np.abs(df["ret1"]) / (df["log_trade_volume"] + eps)
         df["spread_scaled"] = df["spread"] / (df["vol20"] + eps)
 
-        # ---- Time-of-day ----
+        # Time-of-day
         minute_of_day = (df["interval"] / 60_000).astype(int) % 1440
         df["sin_time"] = np.sin(2 * np.pi * minute_of_day / 1440.0)
         df["cos_time"] = np.cos(2 * np.pi * minute_of_day / 1440.0)
 
-        # ---- Intraday cumulative (per symbol, backward-looking) ----
+        # Intraday cumulative (per symbol, backward-looking)
         g = df.groupby("symbol")
         df["cum_ret1"] = g["ret1"].cumsum()
         df["cum_volume"] = (g["tradeBuyQty"].cumsum()
@@ -188,9 +186,9 @@ class MeowFeatureGenerator:
         df["cum_imb"] = g["trade_imb"].expanding().mean().reset_index(level=0, drop=True)
         df["cum_ob_imb0"] = g["ob_imb0"].expanding().mean().reset_index(level=0, drop=True)
 
-        df = df.copy()  # defragment before heavy column additions
+        df = df.copy()
 
-        # ---- Non-linear & interaction features ----
+        # Non-linear & interaction features
 
         # Polynomial terms
         df["ret1_sq"] = df["ret1"] ** 2
@@ -242,7 +240,7 @@ class MeowFeatureGenerator:
 
         df = df.copy()  # defragment before adding new columns
 
-        # ---- NEW: Return dynamics ----
+        # Return dynamics
         g = df.groupby("symbol")
         df["ret_ema_5"] = g["ret1"].transform(
             lambda x: x.ewm(halflife=5, min_periods=1).mean())
@@ -250,34 +248,34 @@ class MeowFeatureGenerator:
             lambda x: x.ewm(halflife=20, min_periods=1).mean())
         df["ret_accel"] = df["ret1"] - df.groupby("symbol")["ret1"].shift(1)
 
-        # ---- NEW: Volatility dynamics ----
+        # Volatility dynamics
         df["vol_of_vol"] = g["vol20"].transform(
             lambda x: x.rolling(50, min_periods=20).std())
         df["vol_ratio_10_20"] = df["vol10"] / (df["vol20"] + eps)
 
-        # ---- NEW: Order book dynamics ----
+        # Order book dynamics
         df["ob_imb_change"] = df["ob_imb0"] - df.groupby("symbol")["ob_imb0"].shift(1)
         df["spread_change"] = df["spread"] - df.groupby("symbol")["spread"].shift(1)
         df["depth_skew"] = (df["bsize0"] - df["asize0"]) / (df["bsize0"] + df["asize0"] + eps)
 
-        # ---- NEW: Trade / volume ----
+        # Trade / volume
         df["trade_imb_x_ob_imb"] = df["trade_imb"] * df["ob_imb0"]
         df["volume_ratio_20"] = df["log_trade_volume"] / (
             g["log_trade_volume"].transform(
                 lambda x: x.rolling(20, min_periods=10).mean()) + eps)
 
-        # ---- NEW: Cross-sectional ----
+        # Cross-sectional
         df["cx_spread"] = df["spread"] - df.groupby("interval")["spread"].transform("mean")
         df["cx_depth_imb"] = df["depth_imb"] - df.groupby("interval")["depth_imb"].transform("mean")
 
-        # ---- NEW: Microstructure / distribution ----
+        # Microstructure / distribution
         df["bid_ask_bounce"] = df["ret1"] * np.sign(
             df.groupby("symbol")["ret1"].shift(1))
         df["ret_autocorr"] = df["ret1"] * df.groupby("symbol")["ret1"].shift(1)
         df["ret_skew_20"] = g["ret1"].transform(
             lambda x: x.rolling(20, min_periods=10).skew())
 
-        # ---- Assemble output ----
+        # Assemble output
         feature_names = self.feature_names()
         keep_cols = self.mcols + feature_names + self.target_horizons
         xdf = df[keep_cols].set_index(self.mcols)

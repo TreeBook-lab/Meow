@@ -9,19 +9,19 @@ class MeowDataLoader(object):
         self.h5dir = h5dir
         self.calendar = Calendar()
 
-    def loadDates(self, dates):
+    def load_dates(self, dates):
         if len(dates) == 0:
             raise ValueError("Dates empty")
         log.inf("Loading data of {} dates from {} to {}...".format(len(dates), min(dates), max(dates)))
-        return pd.concat(self.loadDate(x) for x in dates)
+        return pd.concat(self.load_date(x) for x in dates)
 
-    def loadDate(self, date):
-        if not self.calendar.isTradingDay(date):
+    def load_date(self, date):
+        if not self.calendar.is_trading_day(date):
             raise ValueError("Not a trading day: {}".format(date))
-        h5File = os.path.join(self.h5dir, "{}.h5".format(date))
-        df = pd.read_hdf(h5File)
+        h5_file = os.path.join(self.h5dir, "{}.h5".format(date))
+        df = pd.read_hdf(h5_file)
         df.loc[:, "date"] = date
-        keepcols = [
+        keep_cols = [
             "symbol", "interval", "date",
             "fret12", "midpx", "high", "low",
             "bid0", "ask0", "bid9", "ask9",
@@ -33,5 +33,5 @@ class MeowDataLoader(object):
             "addBuyQty", "addSellQty",
             "cxlBuyQty", "cxlSellQty",
         ]
-        df = df[[c for c in keepcols if c in df.columns]]
+        df = df[[c for c in keep_cols if c in df.columns]]
         return df

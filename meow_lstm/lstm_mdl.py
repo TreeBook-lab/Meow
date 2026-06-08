@@ -22,8 +22,8 @@ class LSTMConfig:
 
 
 class LSTMRegressor(object):
-    def __init__(self, cacheDir, input_size: int, config: Optional[LSTMConfig] = None):
-        self.cacheDir = cacheDir
+    def __init__(self, cache_dir, input_size: int, config: Optional[LSTMConfig] = None):
+        self.cache_dir = cache_dir
         self.config = config or LSTMConfig()
         self.input_size = int(input_size)
         self._torch = None

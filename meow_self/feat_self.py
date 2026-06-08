@@ -14,8 +14,8 @@ class MeowSelfFeatureGenerator(object):
     - Cross-sectional (interval) de-meaning is applied to selected features.
     """
 
-    def __init__(self, cacheDir=None):
-        self.cacheDir = cacheDir
+    def __init__(self, cache_dir=None):
+        self.cache_dir = cache_dir
         self.ycol = "fret12"
         self.mcols = ["symbol", "date", "interval"]
 
@@ -33,7 +33,7 @@ class MeowSelfFeatureGenerator(object):
         return (hh * 60 + mm).astype(np.int32)
 
     @classmethod
-    def featureNames(cls):
+    def feature_names(cls):
         base = [
             # prices
             "ret1",
@@ -121,8 +121,8 @@ class MeowSelfFeatureGenerator(object):
 
         return base + roll + lags + ewms + cs
 
-    def genFeatures(self, df: pd.DataFrame, *, cross_day: bool = False):
-        log.inf("Generating {} self features from raw data...".format(len(self.featureNames())))
+    def gen_features(self, df: pd.DataFrame, *, cross_day: bool = False):
+        log.inf("Generating {} self features from raw data...".format(len(self.feature_names())))
 
         df = df.copy()
 
@@ -288,7 +288,7 @@ class MeowSelfFeatureGenerator(object):
             df.drop(columns=[f"cx_{base_col}"], inplace=True)
 
         # ---------- finalize ----------
-        feats = self.featureNames()
+        feats = self.feature_names()
         xdf = df[self.mcols + feats].set_index(self.mcols)
         ydf = df[self.mcols + [self.ycol]].set_index(self.mcols)
 

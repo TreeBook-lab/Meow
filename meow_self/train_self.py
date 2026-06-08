@@ -75,8 +75,8 @@ class MeowSelfTrainer(object):
         self.calendar = Calendar()
         self.h5dir = h5dir
         self.dloader = MeowDataLoader(h5dir=h5dir)
-        self.feat = MeowSelfFeatureGenerator(cacheDir=None)
-        self.feature_cols = self.feat.featureNames()
+        self.feat = MeowSelfFeatureGenerator(cache_dir=None)
+        self.feature_cols = self.feat.feature_names()
         self.ycol = self.feat.ycol
         self.lookback = int(lookback)
         self.cross_day = bool(cross_day)
@@ -113,7 +113,7 @@ class MeowSelfTrainer(object):
         self._mu = None
         self._sigma = None
 
-        self.evaluator = MeowEvaluator(cacheDir=None)
+        self.evaluator = MeowEvaluator(cache_dir=None)
 
     def _filter_existing_dates(self, dates):
         """Keep only dates that have corresponding {date}.h5 under h5dir."""
@@ -277,19 +277,19 @@ class MeowSelfTrainer(object):
             f"Loading train dates: {len(tr_dates)} (+warmup {len(tr_warm)}); "
             f"val dates: {len(val_dates)} (+warmup {len(va_warm)})"
         )
-        tr_raw = self.dloader.loadDates(
+        tr_raw = self.dloader.load_dates(
             list(tr_warm) + list(tr_dates),
             max_rows_per_date=self.max_rows_per_date,
             seed=self.seed,
         )
-        va_raw = self.dloader.loadDates(
+        va_raw = self.dloader.load_dates(
             list(va_warm) + list(val_dates),
             max_rows_per_date=self.max_rows_per_date,
             seed=self.seed,
         )
 
-        tr_xdf, tr_ydf = self.feat.genFeatures(tr_raw, cross_day=self.cross_day)
-        va_xdf, va_ydf = self.feat.genFeatures(va_raw, cross_day=self.cross_day)
+        tr_xdf, tr_ydf = self.feat.gen_features(tr_raw, cross_day=self.cross_day)
+        va_xdf, va_ydf = self.feat.gen_features(va_raw, cross_day=self.cross_day)
 
         self._fit_scaler(tr_xdf)
         tr_xdf = self._apply_scaler(tr_xdf)
@@ -408,12 +408,12 @@ class MeowSelfTrainer(object):
         warm = []
         if self.warmup_days and self.warmup_days > 0:
             warm = self._filter_existing_dates(self.calendar.prevn(dates[0], self.warmup_days) or [])
-        raw = self.dloader.loadDates(
+        raw = self.dloader.load_dates(
             list(warm) + list(dates),
             max_rows_per_date=self.max_rows_per_date,
             seed=self.seed,
         )
-        xdf, ydf = self.feat.genFeatures(raw, cross_day=self.cross_day)
+        xdf, ydf = self.feat.gen_features(raw, cross_day=self.cross_day)
         xdf = self._apply_scaler(xdf)
 
         idx = build_sequence_index(

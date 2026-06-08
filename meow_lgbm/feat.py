@@ -5,7 +5,7 @@ from log import log
 
 class MeowFeatureGenerator(object):
     @classmethod
-    def featureNames(cls):
+    def feature_names(cls):
         return [
             # === Order Book Imbalance (13 features) ===
             "ob_imb0",
@@ -63,13 +63,13 @@ class MeowFeatureGenerator(object):
             "cs_spread",
         ]
 
-    def __init__(self, cacheDir):
-        self.cacheDir = cacheDir
+    def __init__(self, cache_dir):
+        self.cache_dir = cache_dir
         self.ycol = "fret12"
         self.mcols = ["symbol", "date", "interval"]
 
-    def genFeatures(self, df):
-        n_features = len(self.featureNames())
+    def gen_features(self, df):
+        n_features = len(self.feature_names())
         log.inf("Generating {} features from raw data...".format(n_features))
 
         # ---- Order Book Imbalance ----
@@ -169,6 +169,6 @@ class MeowFeatureGenerator(object):
             df = df.merge(cs_rank, left_index=True, right_index=True, how="left")
 
         # ---- Build feature matrix ----
-        xdf = df[self.mcols + self.featureNames()].set_index(self.mcols)
+        xdf = df[self.mcols + self.feature_names()].set_index(self.mcols)
         ydf = df[self.mcols + [self.ycol]].set_index(self.mcols)
         return xdf.fillna(0), ydf.fillna(0)

@@ -39,7 +39,7 @@ class MeowLSTMEngine(object):
     def __init__(
         self,
         h5dir,
-        cacheDir,
+        cache_dir,
         *,
         lookback: int,
         config: LSTMConfig,
@@ -53,16 +53,16 @@ class MeowLSTMEngine(object):
         if not os.path.isdir(h5dir):
             raise ValueError("Invalid data directory: {}".format(self.h5dir))
 
-        self.cacheDir = cacheDir
+        self.cache_dir = cache_dir
         self.lookback = int(lookback)
         self.max_rows_per_date = int(max_rows_per_date)
         self.max_symbols_per_date = int(max_symbols_per_date)
         self.dloader = MeowDataLoader(h5dir=h5dir)
-        self.featGenerator = MeowFeatureGenerator(cacheDir=cacheDir)
-        self.feature_cols = self.featGenerator.featureNames()
-        self.ycol = self.featGenerator.ycol
-        self.model = LSTMRegressor(cacheDir=cacheDir, input_size=len(self.feature_cols), config=config)
-        self.evaluator = MeowEvaluator(cacheDir=cacheDir)
+        self.feat_generator = MeowFeatureGenerator(cache_dir=cache_dir)
+        self.feature_cols = self.feat_generator.feature_names()
+        self.ycol = self.feat_generator.ycol
+        self.model = LSTMRegressor(cache_dir=cache_dir, input_size=len(self.feature_cols), config=config)
+        self.evaluator = MeowEvaluator(cache_dir=cache_dir)
 
         self._mu = None
         self._sigma = None
@@ -77,7 +77,7 @@ class MeowLSTMEngine(object):
 
         dfs = []
         for d in dates:
-            df = self.dloader.loadDate(int(d))
+            df = self.dloader.load_date(int(d))
             if self.max_symbols_per_date and self.max_symbols_per_date > 0:
                 syms = df["symbol"].dropna().unique().tolist()
                 syms = sorted(syms)[: int(self.max_symbols_per_date)]
@@ -104,11 +104,11 @@ class MeowLSTMEngine(object):
         out.loc[:, self.feature_cols] = x
         return out
 
-    def fit(self, startDate, endDate):
-        dates = self.calendar.range(startDate, endDate)
-        rawData = self._load_dates(dates)
+    def fit(self, start_date, end_date):
+        dates = self.calendar.range(start_date, end_date)
+        raw_data = self._load_dates(dates)
         log.inf("Running LSTM model fitting...")
-        xdf, ydf = self.featGenerator.genFeatures(rawData)
+        xdf, ydf = self.feat_generator.gen_features(raw_data)
 
         self._fit_scaler(xdf)
         xdf = self._apply_scaler(xdf)
@@ -123,11 +123,11 @@ class MeowLSTMEngine(object):
         log.inf("Train sequences: {} samples".format(seq.x.shape[0]))
         self.model.fit(seq.x, seq.y)
 
-    def eval(self, startDate, endDate):
+    def eval(self, start_date, end_date):
         log.inf("Running model evaluation...")
-        dates = self.calendar.range(startDate, endDate)
-        rawData = self._load_dates(dates)
-        xdf, ydf = self.featGenerator.genFeatures(rawData)
+        dates = self.calendar.range(start_date, end_date)
+        raw_data = self._load_dates(dates)
+        xdf, ydf = self.feat_generator.gen_features(raw_data)
         xdf = self._apply_scaler(xdf)
 
         seq = build_sequences(
@@ -207,7 +207,7 @@ if __name__ == "__main__":
 
     engine = MeowLSTMEngine(
         h5dir=args.h5dir,
-        cacheDir=None,
+        cache_dir=None,
         lookback=args.lookback,
         config=cfg,
         max_rows_per_date=args.max_rows_per_date,
@@ -216,10 +216,10 @@ if __name__ == "__main__":
     if args.feature_set == "self":
         if MeowSelfFeatureGenerator is None:
             raise ImportError("meow_self feature generator not available")
-        engine.featGenerator = MeowSelfFeatureGenerator(cacheDir=None)
-        engine.feature_cols = engine.featGenerator.featureNames()
-        engine.ycol = engine.featGenerator.ycol
-        engine.model = LSTMRegressor(cacheDir=None, input_size=len(engine.feature_cols), config=cfg)
+        engine.feat_generator = MeowSelfFeatureGenerator(cache_dir=None)
+        engine.feature_cols = engine.feat_generator.feature_names()
+        engine.ycol = engine.feat_generator.ycol
+        engine.model = LSTMRegressor(cache_dir=None, input_size=len(engine.feature_cols), config=cfg)
 
     engine.fit(args.train_start, args.train_end)
     engine.eval(args.test_start, args.test_end)

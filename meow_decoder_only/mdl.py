@@ -116,11 +116,6 @@ class DecoderBlock(nn.Module):
         return x
 
 class CrossStockAttention(nn.Module):
-    """Attention over stocks at each time step.
-
-    Transposes (B, T, D) → (T, B, D) so that each time slice attends
-    across stocks.  Padded stocks are masked per time step.
-    """
 
     def __init__(self, model_dim: int, n_heads: int, dropout: float):
         super().__init__()
@@ -133,12 +128,12 @@ class CrossStockAttention(nn.Module):
                 padding_mask: torch.Tensor | None = None) -> torch.Tensor:
         residual = x
         x = self.norm(x)
-        x = x.transpose(0, 1)                    # (T, B, D)
+        x = x.transpose(0, 1)
         key_pad = None
         if padding_mask is not None:
-            key_pad = padding_mask.transpose(0, 1)  # (T, B) — True = ignore
+            key_pad = padding_mask.transpose(0, 1)
         x, _ = self.attn(x, x, x, key_padding_mask=key_pad)
-        x = x.transpose(0, 1)                    # (B, T, D)
+        x = x.transpose(0, 1)
         return residual + self.dropout(x)
 
 
@@ -147,7 +142,6 @@ class SparseAttentionRegressor(nn.Module):
         super().__init__()
         self.cfg = cfg
 
-        # Gated feature selection — soft mask learned per feature
         self.feat_gate = nn.Parameter(torch.ones(cfg.n_features))
 
         self.feat_proj = nn.Linear(cfg.n_features, cfg.model_dim, bias=True)
@@ -156,7 +150,6 @@ class SparseAttentionRegressor(nn.Module):
         self.feat_norm = RMSNorm(cfg.model_dim)
         self.drop = nn.Dropout(cfg.dropout)
 
-        # Optional cross-stock attention
         self.cross_stock = None
         if cfg.cross_stock_attn:
             self.cross_stock = CrossStockAttention(
@@ -171,15 +164,12 @@ class SparseAttentionRegressor(nn.Module):
         ])
 
         self.norm_f = RMSNorm(cfg.model_dim)
-        # Per-horizon output heads + skip connections
         self.heads = nn.ModuleDict({
             h: nn.Linear(cfg.model_dim, 1, bias=True)
             for h in cfg.target_horizons})
         self.lin_skips = nn.ModuleDict({
             h: nn.Linear(cfg.n_features, 1, bias=True)
             for h in cfg.target_horizons})
-        # Learnable output scale — lets the model match target variance
-        # without relying solely on noisy MSE gradients
         self.log_scale = nn.Parameter(torch.zeros(1))
 
     def forward(self, x_raw: torch.Tensor, stock_ids: torch.Tensor,
@@ -187,7 +177,6 @@ class SparseAttentionRegressor(nn.Module):
                 horizon: str | None = None) -> dict | torch.Tensor:
         b, t, _ = x_raw.shape
 
-        # Gated feature selection
         gated = x_raw * self.feat_gate.sigmoid()
 
         x = self.feat_proj(gated)
@@ -198,7 +187,6 @@ class SparseAttentionRegressor(nn.Module):
         x = self.feat_norm(x)
         x = self.drop(x)
 
-        # Cross-stock attention (per time step)
         if self.cross_stock is not None:
             x = self.cross_stock(x, padding_mask)
 
@@ -297,7 +285,6 @@ class MeowModel:
         )
 
     def fit_preprocessing(self, xdf, ydf):
-        # Use primary horizon (fret12) for fitting vol20 normalisation
         primary_y = ydf["fret12"].to_numpy().ravel()
         all_y = self._clean(primary_y)
         all_x = self._clean(xdf.to_numpy())
@@ -361,7 +348,6 @@ class MeowModel:
         syms = self._symbols(xdf)
         horizons = list(self.cfg.target_horizons)
 
-        # Vol20-normalise all target horizons
         if self.pcfg.vol20_idx is not None:
             vol20_arr = np.abs(self._clean(xdf["vol20"].to_numpy().ravel()))
             vol20_arr = np.clip(vol20_arr, self.pcfg.vol20_floor, None) + 1e-8
@@ -379,7 +365,6 @@ class MeowModel:
                     x, stock_ids=sym_ids, padding_mask=mask)
                 valid = ~mask
 
-                # MSE-primary + Pearson-auxiliary hybrid loss
                 total_loss = 0.0
                 for hi, h in enumerate(horizons):
                     p_v = preds[h][valid]
@@ -392,7 +377,6 @@ class MeowModel:
                     loss_corr = -cov / ((p_v.std() + 1e-8) * (y_v.std() + 1e-8))
                     total_loss = total_loss + 3.0 * loss_mse + 0.2 * loss_corr
 
-                # Gate sparsity penalty — push unused feature gates toward 0
                 gate_penalty = 5e-4 * self.model.feat_gate.sigmoid().sum()
                 loss = total_loss + gate_penalty
 

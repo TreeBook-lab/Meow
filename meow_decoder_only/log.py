@@ -5,11 +5,11 @@ from inspect import currentframe, getframeinfo
 
 class MeowLogger(object):
     def __init__(self):
-        self.logf = None
+        self.log_file = None
 
     def __del__(self):
-        if self.logf is not None:
-            self.logf.close()
+        if self.log_file is not None:
+            self.log_file.close()
 
     def __header(self, pid):
         now = datetime.now()
@@ -23,17 +23,17 @@ class MeowLogger(object):
             now.strftime("%Y-%m-%dT%H:%M:%S.%f"),
             os.path.basename(frame_info.filename), frame_info.lineno)
 
-    def setLogFile(self, filename):
-        if self.logf is not None:
-            self.logf.close()
-        self.logf = open(filename, "w")
+    def set_log_file(self, filename):
+        if self.log_file is not None:
+            self.log_file.close()
+        self.log_file = open(filename, "w")
 
     def log(self, content, muted=False):
         if muted:
             return
-        if self.logf is not None:
-            self.logf.write(content + "\n")
-            self.logf.flush()
+        if self.log_file is not None:
+            self.log_file.write(content + "\n")
+            self.log_file.flush()
             return
         print(content)
 
@@ -42,6 +42,8 @@ class MeowLogger(object):
 
     def grey(self, line, pid=False, muted=False):
         self.log("\033[90m{}\033[0m".format(line), muted)
+
+
 
     def red(self, line, pid=False, muted=False):
         self.log("{}\033[91m{}\033[0m".format(self.__header(pid), line), muted)

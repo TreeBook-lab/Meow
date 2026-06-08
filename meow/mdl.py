@@ -5,7 +5,7 @@ from log import log
 
 
 class MeowModel(object):
-    def __init__(self, cacheDir):
+    def __init__(self, cache_dir):
         self.estimator = Ridge(
             alpha=0.5,
             random_state=None,

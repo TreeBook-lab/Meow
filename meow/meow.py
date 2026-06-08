@@ -25,35 +25,35 @@ except Exception:
 
 
 class MeowEngine(object):
-    def __init__(self, h5dir, cacheDir, *, max_rows_per_date: int = 0):
+    def __init__(self, h5dir, cache_dir, *, max_rows_per_date: int = 0):
         self.calendar = Calendar()
         self.h5dir = h5dir
         if not os.path.exists(h5dir):
             raise ValueError("Data directory not exists: {}".format(self.h5dir))
         if not os.path.isdir(h5dir):
             raise ValueError("Invalid data directory: {}".format(self.h5dir))
-        self.cacheDir = cacheDir # this is not used in sample code
+        self.cache_dir = cache_dir  # this is not used in sample code
         self.max_rows_per_date = int(max_rows_per_date)
         self.dloader = MeowDataLoader(h5dir=h5dir)
-        self.featGenerator = MeowFeatureGenerator(cacheDir=cacheDir)
-        self.model = MeowModel(cacheDir=cacheDir)
-        self.evaluator = MeowEvaluator(cacheDir=cacheDir)
+        self.feat_generator = MeowFeatureGenerator(cache_dir=cache_dir)
+        self.model = MeowModel(cache_dir=cache_dir)
+        self.evaluator = MeowEvaluator(cache_dir=cache_dir)
 
-    def fit(self, startDate, endDate):
-        dates = self.calendar.range(startDate, endDate)
-        rawData = self.dloader.loadDates(dates, max_rows_per_date=self.max_rows_per_date)
+    def fit(self, start_date, end_date):
+        dates = self.calendar.range(start_date, end_date)
+        raw_data = self.dloader.load_dates(dates, max_rows_per_date=self.max_rows_per_date)
         log.inf("Running model fitting...")
-        xdf, ydf = self.featGenerator.genFeatures(rawData)
+        xdf, ydf = self.feat_generator.gen_features(raw_data)
         self.model.fit(xdf, ydf)
 
     def predict(self, xdf):
         return self.model.predict(xdf)
 
-    def eval(self, startDate, endDate):
+    def eval(self, start_date, end_date):
         log.inf("Running model evaluation...")
-        dates = self.calendar.range(startDate, endDate)
-        rawData = self.dloader.loadDates(dates, max_rows_per_date=self.max_rows_per_date)
-        xdf, ydf = self.featGenerator.genFeatures(rawData)
+        dates = self.calendar.range(start_date, end_date)
+        raw_data = self.dloader.load_dates(dates, max_rows_per_date=self.max_rows_per_date)
+        xdf, ydf = self.feat_generator.gen_features(raw_data)
         ydf.loc[:, "forecast"] = self.predict(xdf)
         self.evaluator.eval(ydf)
 
@@ -75,11 +75,11 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    engine = MeowEngine(h5dir=args.h5dir, cacheDir=None, max_rows_per_date=args.max_rows_per_date)
+    engine = MeowEngine(h5dir=args.h5dir, cache_dir=None, max_rows_per_date=args.max_rows_per_date)
     if args.feature_set == "self":
         if MeowSelfFeatureGenerator is None:
             raise ImportError("meow_self feature generator not available")
-        engine.featGenerator = MeowSelfFeatureGenerator(cacheDir=None)
+        engine.feat_generator = MeowSelfFeatureGenerator(cache_dir=None)
 
     engine.fit(args.train_start, args.train_end)
     engine.eval(args.test_start, args.test_end)

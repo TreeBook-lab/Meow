@@ -9,10 +9,10 @@ class MeowDataLoader:
         self.calendar = Calendar()
 
     def load_date(self, date):
-        if not self.calendar.isTradingDay(date):
+        if not self.calendar.is_trading_day(date):
             raise ValueError("Not a trading day: {}".format(date))
-        h5file = os.path.join(self.h5dir, "{}.h5".format(date))
-        df = pd.read_hdf(h5file)
+        h5_file = os.path.join(self.h5dir, "{}.h5".format(date))
+        df = pd.read_hdf(h5_file)
         df.loc[:, "date"] = date
         precols = ["symbol", "interval", "date"]
         df = df[precols + [x for x in df.columns if x not in precols]]

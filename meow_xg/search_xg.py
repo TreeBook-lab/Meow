@@ -85,8 +85,8 @@ def make_feature_generator(feature_set: str):
     if feature_set == "self":
         if MeowSelfFeatureGenerator is None:
             raise ImportError("meow_self feature generator not available")
-        return MeowSelfFeatureGenerator(cacheDir=None)
-    return MeowFeatureGenerator(cacheDir=None)
+        return MeowSelfFeatureGenerator(cache_dir=None)
+    return MeowFeatureGenerator(cache_dir=None)
 
 
 def load_xy(
@@ -101,7 +101,7 @@ def load_xy(
     calendar = Calendar()
     dates = calendar.range(start_date, end_date)
     loader = MeowDataLoader(h5dir=h5dir)
-    raw = loader.loadDates(
+    raw = loader.load_dates(
         dates,
         columns=required_columns(feature_set),
         max_rows_per_date=max_rows_per_date,
@@ -109,8 +109,8 @@ def load_xy(
     )
     feat_gen = make_feature_generator(feature_set)
     if feature_set == "self":
-        return feat_gen.genFeatures(raw, cross_day=bool(cross_day))
-    return feat_gen.genFeatures(raw)
+        return feat_gen.gen_features(raw, cross_day=bool(cross_day))
+    return feat_gen.gen_features(raw)
 
 
 def maybe_subsample_xy(xdf, ydf, max_rows: int, seed: int):
@@ -125,7 +125,7 @@ def maybe_subsample_xy(xdf, ydf, max_rows: int, seed: int):
 def evaluate(model: MeowXGModel, xdf, ydf) -> Dict[str, float]:
     eval_ydf = ydf.copy()
     eval_ydf.loc[:, "forecast"] = model.predict(xdf)
-    return MeowEvaluator(cacheDir=None).eval(eval_ydf)
+    return MeowEvaluator(cache_dir=None).eval(eval_ydf)
 
 
 def candidate_configs(seed: int, tree_method: str, n_jobs: int) -> List[XGBoostConfig]:
@@ -242,7 +242,7 @@ def main():
 
     for i, cfg in enumerate(configs, start=1):
         log.inf(f"Trial {i}/{len(configs)}: {asdict(cfg)}")
-        model = MeowXGModel(cacheDir=None, config=cfg)
+        model = MeowXGModel(cache_dir=None, config=cfg)
         model.fit(x_train, y_train)
         metrics = evaluate(model, x_val, y_val)
         score = score_value(metrics, args.score_metric)
@@ -283,7 +283,7 @@ def main():
     x_test, y_test = maybe_subsample_xy(x_test, y_test, args.max_test_rows, args.seed)
     log.inf(f"Final train shape: {x_final.shape}, test shape: {x_test.shape}")
 
-    final_model = MeowXGModel(cacheDir=None, config=best_cfg)
+    final_model = MeowXGModel(cache_dir=None, config=best_cfg)
     final_model.fit(x_final, y_final)
     test_metrics = evaluate(final_model, x_test, y_test)
 
